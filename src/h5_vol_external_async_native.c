@@ -849,7 +849,7 @@ static herr_t H5VL_async_object_optional(void *obj, H5VL_object_optional_t opt_t
 
 /* Container/connector introspection callbacks */
 static herr_t H5VL_async_introspect_get_conn_cls(void *obj, H5VL_get_conn_lvl_t lvl, const H5VL_class_t **conn_cls);
-static herr_t H5VL_async_introspect_opt_query(void *obj, H5VL_subclass_t cls, int opt_type, hbool_t *supported);
+static herr_t H5VL_async_introspect_opt_query(void *obj, H5VL_subclass_t cls, int opt_type, uint64_t *flags);
 
 /* Async request callbacks */
 static herr_t H5VL_async_request_wait(void *req, uint64_t timeout, H5VL_request_status_t *status);
@@ -879,9 +879,10 @@ static herr_t H5VL_async_optional(void *obj, int op_type, hid_t dxpl_id, void **
 
 /* async VOL connector class struct */
 static const H5VL_class_t H5VL_async_g = {
-    H5VL_ASYNC_VERSION,                      /* version      */
+    H5VL_VERSION,                            /* VOL class struct version */
     (H5VL_class_value_t)H5VL_ASYNC_VALUE,    /* value        */
     H5VL_ASYNC_NAME,                         /* name         */
+    H5VL_ASYNC_VERSION,                      /* connector version */
     0,                                       /* capability flags */
     H5VL_async_init,                         /* initialize   */
     H5VL_async_term,                         /* terminate    */
@@ -1708,7 +1709,7 @@ int get_n_running_task_in_queue_obj(H5VL_async_t *async_obj)
     DL_FOREACH2(async_obj->file_task_list_head, task_elt, file_list_next) {
         if (task_elt->abt_thread != NULL) {
             ABT_thread_get_state(task_elt->abt_thread, &thread_state);
-            if (thread_state == ABT_THREAD_STATE_RUNNING && thread_state == ABT_THREAD_STATE_READY) {
+            if (thread_state == ABT_THREAD_STATE_RUNNING || thread_state == ABT_THREAD_STATE_READY) {
                 remaining_task++;
             }
         }
@@ -11888,7 +11889,7 @@ async_file_create_fn(void *foo)
     async_file_create_args_t *args = (async_file_create_args_t*)(task->args);
     herr_t status;
     hid_t under_vol_id;
-    hbool_t supported;          /* Whether 'post open' operation is supported by VOL connector */
+    uint64_t flags;          /* Whether 'post open' operation is supported by VOL connector */
 
 #ifdef ENABLE_TIMING
     struct timeval now_time;
@@ -12052,12 +12053,12 @@ async_file_create_fn(void *foo)
     }
 
     /* Check for 'post open' callback */
-    supported = 0;
-    if(H5VLintrospect_opt_query(obj, under_vol_id, H5VL_SUBCLS_FILE, H5VL_NATIVE_FILE_POST_OPEN, &supported) < 0) {
+    flags = 0;
+    if(H5VLintrospect_opt_query(obj, under_vol_id, H5VL_SUBCLS_FILE, H5VL_NATIVE_FILE_POST_OPEN, &flags) < 0) {
         fprintf(stderr,"  [ASYNC ABT ERROR] %s H5VLintrospect_opt_query failed\n", __func__);
         goto done;
     }
-    if(supported) {
+    if(flags & H5VL_OPT_QUERY_SUPPORTED) {
         /* Make the 'post open' callback */
         /* Try executing operation, without default error stack handling */
         H5E_BEGIN_TRY {
@@ -12343,7 +12344,7 @@ async_file_open_fn(void *foo)
     async_file_open_args_t *args = (async_file_open_args_t*)(task->args);
     herr_t status;
     hid_t under_vol_id;
-    hbool_t supported;          /* Whether 'post open' operation is supported by VOL connector */
+    uint64_t flags;          /* Whether 'post open' operation is supported by VOL connector */
 
 #ifdef ENABLE_TIMING
     struct timeval now_time;
@@ -12507,17 +12508,17 @@ async_file_open_fn(void *foo)
     }
 
     /* Check for 'post open' callback */
-    supported = 0;
+    flags = 0;
     /* Try executing operation, without default error stack handling */
     H5E_BEGIN_TRY {
-        status = H5VLintrospect_opt_query(obj, under_vol_id, H5VL_SUBCLS_FILE, H5VL_NATIVE_FILE_POST_OPEN, &supported);
+        status = H5VLintrospect_opt_query(obj, under_vol_id, H5VL_SUBCLS_FILE, H5VL_NATIVE_FILE_POST_OPEN, &flags);
     } H5E_END_TRY
     if ( status < 0 ) {
         if ((task->err_stack = H5Eget_current_stack()) < 0)
             fprintf(stderr,"  [ASYNC ABT ERROR] %s H5Eget_current_stack failed\n", __func__);
         goto done;
     }
-    if(supported) {
+    if(flags & H5VL_OPT_QUERY_SUPPORTED) {
         /* Make the 'post open' callback */
         /* Try executing operation, without default error stack handling */
         H5E_BEGIN_TRY {
@@ -23954,7 +23955,7 @@ H5VL_async_introspect_get_conn_cls(void *obj, H5VL_get_conn_lvl_t lvl,
  */
 herr_t
 H5VL_async_introspect_opt_query(void *obj, H5VL_subclass_t cls,
-                                int opt_type, hbool_t *supported)
+                                int opt_type, uint64_t *flags)
 {
     H5VL_async_t *o = (H5VL_async_t *)obj;
     herr_t ret_value;
@@ -23968,13 +23969,13 @@ H5VL_async_introspect_opt_query(void *obj, H5VL_subclass_t cls,
      * create or query operation.
      */
     if(H5VL_NATIVE_FILE_POST_OPEN == opt_type) {
-        if(supported)
-            *supported = 0;
+        if(flags)
+            *flags = 0;
         ret_value = 0;
     } /* end if */
     else
         ret_value = H5VLintrospect_opt_query(o->under_object, o->under_vol_id, cls,
-                                             opt_type, supported);
+                                             opt_type, flags);
 
     return ret_value;
 } /* end H5VL_async_introspect_opt_query() */
