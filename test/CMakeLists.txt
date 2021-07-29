@@ -16,7 +16,7 @@ set(test  async_test_multifile
 	  async_test_serial_error_stack
 	  async_test_serial_event_set
 	  async_test_serial_event_set_error_stack
-    async_test_parallel2
+    	  async_test_parallel2
 	  async_test_parallel3
 	  async_test_parallel4
 	  async_test_parallel5
