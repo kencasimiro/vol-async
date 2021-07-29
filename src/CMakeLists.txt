@@ -1,10 +1,10 @@
 set(HDF5_VOL_ASYNC_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/h5_async_lib.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/h5_vol_external_async_native.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/h5_async_vol.h
 )
 
 set(HDF5_VOL_ASYNC_SRCS
-    ${CMAKE_CURRENT_SOURCE_DIR}/h5_vol_external_async_native.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/h5_async_vol.c
     ${CMAKE_CURRENT_SOURCE_DIR}/h5_async_lib.c)
 
 add_library(hdf5_vol_async SHARED ${HDF5_VOL_ASYNC_SRCS})
